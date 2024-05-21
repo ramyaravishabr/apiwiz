@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git 'https://github.com/apiwizlabs/wizdesk.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'cd wizdesk && mvn clean package'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'cd wizdesk && mvn test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("your-docker-username/wizdesk:${env.BUILD_ID}")
+                }
+            }
+        }
+
+        stage('Publish Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("your-docker-username/wizdesk:${env.BUILD_ID}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    kubernetesDeploy(
+                        kubeconfigId: 'your-kubernetes-credentials',
+                        configs: 'kubernetes/deployment.yaml'
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
+
